@@ -1,0 +1,19 @@
+{
+  "name": "fairtaxonomy-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Auth wrapper (GitHub, Helmholtz ID, Keycloak) and GitHub on-behalf-of proxy for FAIRTaxonomy.",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  }
+}

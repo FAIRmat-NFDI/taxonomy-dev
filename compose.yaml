@@ -1,0 +1,17 @@
+# Local development services. The app (app/) and the core API (backend/core/) run with npm.
+#
+#   docker compose up iam          Keycloak on http://localhost:8080 (admin / admin, development only)
+#
+# Data is kept in the "iam-data" volume; `docker compose down -v` resets it (re-imports the realm).
+services:
+  iam:
+    build: backend/iam/docker
+    ports:
+      - "8080:8080"
+    environment:
+      KC_COMMAND: start-dev
+    volumes:
+      - iam-data:/opt/keycloak/data/h2
+
+volumes:
+  iam-data:

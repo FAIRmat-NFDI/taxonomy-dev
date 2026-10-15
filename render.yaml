@@ -1,0 +1,51 @@
+# Render Blueprint — creates the backend services once (Dashboard → New → Blueprint).
+#
+#   fairtaxonomy-core     backend/core   Node (Express) API: login wrapper + GitHub proxy
+#   fairtaxonomy-iam      backend/iam    Keycloak (Docker) for email + password login
+#   fairtaxonomy-iam-db                  Postgres for Keycloak
+#
+# Deploys and configuration come from GitHub Actions (core.yml, iam.yml), after tests pass:
+# auto-deploy is off, and no secret is defined here. Until those workflows have run once, the IAM
+# service refuses to start (no secrets yet) and core runs with no logins configured — intended.
+# See docs/RENDER.md.
+databases:
+  - name: fairtaxonomy-iam-db
+    plan: free
+    region: frankfurt
+    databaseName: keycloak
+    user: keycloak
+    ipAllowList: []          # private network only
+
+services:
+  - type: web
+    name: fairtaxonomy-core
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: backend/core
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+
+  - type: web
+    name: fairtaxonomy-iam
+    runtime: docker
+    plan: free               # Keycloak is memory-hungry: use 1c-2g (Standard) for anything beyond testing
+    region: frankfurt
+    dockerContext: ./backend/iam/docker
+    dockerfilePath: ./backend/iam/docker/Dockerfile
+    healthCheckPath: /realms/fairtaxonomy
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: PORT            # tells Render which port Keycloak listens on
+        value: '8080'
+      - key: KC_COMMAND
+        value: start
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fairtaxonomy-iam-db
+          property: connectionString

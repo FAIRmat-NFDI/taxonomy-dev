@@ -1,0 +1,444 @@
+# =============================================================================
+#  example-main.ttl  —  Taxonomy Playground showcase ontology
+#
+#  Minimal but exhaustive: every OWL 2 (DL) construct appears at least once,
+#  plus the graph shapes a viewer must cope with (cycles, diamonds, deep chains,
+#  orphans, self-loops, GCIs, punning, external and dangling references).
+#
+#  Section index (search for "§"):
+#   §1 Header & imports          §7  Object property axioms
+#   §2 Annotation properties     §8  Data property axioms
+#   §3 Datatypes / data ranges   §9  Keys
+#   §4 Class hierarchy shapes    §10 Individuals & assertions
+#   §5 Class expressions         §11 Axiom annotations (reification)
+#   §6 Class axioms              §12 Edge cases
+# =============================================================================
+
+@base           <https://example.org/fairmat/playground> .
+@prefix :       <https://example.org/fairmat/playground#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov:   <http://www.w3.org/ns/prov#> .
+@prefix obo:    <http://purl.obolibrary.org/obo/> .
+@prefix qudt:   <http://qudt.org/schema/qudt/> .
+
+# ── §1 Ontology header ───────────────────────────────────────────────────────
+<https://example.org/fairmat/playground>
+    a                           owl:Ontology ;
+    owl:versionIRI              <https://example.org/fairmat/playground/0.2.0> ;
+    owl:versionInfo             "0.2.0" ;
+    owl:priorVersion            <https://example.org/fairmat/playground/0.1.0> ;
+    owl:backwardCompatibleWith  <https://example.org/fairmat/playground/0.1.0> ;
+    owl:incompatibleWith        <https://example.org/fairmat/playground/0.0.1> ;
+    owl:imports                 <http://purl.obolibrary.org/obo/bfo.owl> ;     # external import
+    dcterms:title               "Taxonomy Playground showcase"@en ,
+                                "Taxonomie-Spielwiese Beispiel"@de ;
+    dcterms:description         """Exercises every OWL 2 construct in a small
+materials-sample domain. Not intended to be scientifically complete."""@en ;
+    dcterms:creator             "FAIRmat" ;
+    dcterms:created             "2026-10-14"^^xsd:date ;
+    dcterms:license             <https://creativecommons.org/licenses/by/4.0/> ;
+    rdfs:seeAlso                <https://www.fairmat-nfdi.eu/fairmat> .
+
+# ── §2 Annotation properties ─────────────────────────────────────────────────
+:editorialNote a owl:AnnotationProperty ;
+    rdfs:label         "editorial note"@en ;
+    rdfs:subPropertyOf rdfs:comment ;                  # annotation sub-property
+    rdfs:domain        owl:Class ;                     # annotation property domain
+    rdfs:range         xsd:string .                    # annotation property range
+
+dcterms:source     a owl:AnnotationProperty .
+dcterms:isReplacedBy a owl:AnnotationProperty .
+skos:definition    a owl:AnnotationProperty .
+skos:altLabel      a owl:AnnotationProperty .
+skos:exactMatch    a owl:AnnotationProperty .           # punned as annotation (OWL 2 DL safe)
+
+# ── §3 Datatype definitions & data ranges ────────────────────────────────────
+:TemperatureKelvin a rdfs:Datatype ;                   # facet restriction
+    rdfs:label "temperature in kelvin"@en ;
+    owl:equivalentClass [
+        a rdfs:Datatype ;
+        owl:onDatatype xsd:decimal ;
+        owl:withRestrictions ( [ xsd:minInclusive "0"^^xsd:decimal ] )
+    ] .
+
+:PHValue a rdfs:Datatype ;                             # two facets
+    owl:equivalentClass [
+        a rdfs:Datatype ;
+        owl:onDatatype xsd:decimal ;
+        owl:withRestrictions ( [ xsd:minInclusive "0"^^xsd:decimal ]
+                               [ xsd:maxInclusive "14"^^xsd:decimal ] )
+    ] .
+
+:SampleState a rdfs:Datatype ;                         # DataOneOf (enumeration)
+    owl:equivalentClass [ a rdfs:Datatype ; owl:oneOf ( "solid" "liquid" "gas" ) ] .
+
+:NegativeTemperatureCelsius a rdfs:Datatype ;          # DataComplementOf + DataIntersectionOf
+    owl:equivalentClass [
+        a rdfs:Datatype ;
+        owl:intersectionOf ( xsd:decimal
+                             [ a rdfs:Datatype ;
+                               owl:datatypeComplementOf [ a rdfs:Datatype ;
+                                   owl:onDatatype xsd:decimal ;
+                                   owl:withRestrictions ( [ xsd:minInclusive "0"^^xsd:decimal ] ) ] ] )
+    ] .
+
+:IdentifierValue a rdfs:Datatype ;                     # DataUnionOf
+    owl:equivalentClass [ a rdfs:Datatype ; owl:unionOf ( xsd:string xsd:integer ) ] .
+
+# ── §4 Class hierarchy shapes ────────────────────────────────────────────────
+
+# Root linked to an EXTERNAL class (BFO "material entity")
+:MaterialEntity a owl:Class ;
+    rdfs:label "material entity"@en , "materielle Entität"@de ;
+    skos:definition "Anything with mass that a lab can handle."@en ;
+    rdfs:subClassOf obo:BFO_0000040 ;
+    skos:exactMatch obo:BFO_0000040 .
+
+# Deep acyclic chain: MaterialEntity > Sample > SolidSample > CrystallineSample > SingleCrystal
+:Sample a owl:Class ;
+    rdfs:label "sample"@en , "Probe"@de ;
+    skos:altLabel "specimen material"@en ;
+    skos:definition "A portion of material selected for study."@en ;
+    rdfs:comment "Central class; most constructs hang off it."@en ;
+    rdfs:subClassOf :MaterialEntity .
+
+:SolidSample        a owl:Class ; rdfs:label "solid sample"@en ;        rdfs:subClassOf :Sample .
+:LiquidSample       a owl:Class ; rdfs:label "liquid sample"@en ;       rdfs:subClassOf :Sample .
+:GaseousSample      a owl:Class ; rdfs:label "gaseous sample"@en ;      rdfs:subClassOf :Sample .
+:CrystallineSample  a owl:Class ; rdfs:label "crystalline sample"@en ;  rdfs:subClassOf :SolidSample .
+:SingleCrystal      a owl:Class ; rdfs:label "single crystal"@en ;      rdfs:subClassOf :CrystallineSample .
+
+# Diamond / multiple inheritance (acyclic DAG)
+:Substrate a owl:Class ; rdfs:label "substrate"@en ; rdfs:subClassOf :MaterialEntity .
+:CoatedSubstrate a owl:Class ;
+    rdfs:label "coated substrate"@en ;
+    rdfs:subClassOf :SolidSample , :Substrate .        # two parents
+
+# CYCLIC subclass chain: Specimen > TestPiece > Coupon > Specimen (all equivalent by entailment)
+:Specimen  a owl:Class ; rdfs:label "specimen"@en ;   rdfs:subClassOf :SolidSample , :Coupon .
+:TestPiece a owl:Class ; rdfs:label "test piece"@en ; rdfs:subClassOf :Specimen .
+:Coupon    a owl:Class ; rdfs:label "coupon"@en ;     rdfs:subClassOf :TestPiece .
+
+# Self-loop (trivially true, but must not hang a tree renderer)
+:Specimen rdfs:subClassOf :Specimen .
+
+# Orphan: declared class with no superclass
+:Orphan a owl:Class ;
+    rdfs:label "orphan class"@en ;
+    :editorialNote "Intentionally unattached — should appear at the root level." .
+
+# Supporting classes
+:Instrument a owl:Class ; rdfs:label "instrument"@en ; rdfs:subClassOf prov:Entity .
+:Person     a owl:Class ; rdfs:label "person"@en ;     rdfs:subClassOf prov:Agent .
+:Layer      a owl:Class ; rdfs:label "layer"@en ;      rdfs:subClassOf :MaterialEntity .
+:Metal      a owl:Class ; rdfs:label "metal"@en ;      rdfs:subClassOf :MaterialEntity .
+:ThinFilm   a owl:Class ; rdfs:label "thin film"@en ;  rdfs:subClassOf :SolidSample .
+:Measurement a owl:Class ; rdfs:label "measurement"@en ; rdfs:subClassOf prov:Activity .
+:LabNotebookEntry a owl:Class ; rdfs:label "lab notebook entry"@en .
+:Technique  a owl:Class ; rdfs:label "characterisation technique"@en .
+
+# ── §5 Class expressions (every constructor) ─────────────────────────────────
+
+# Named-class equivalence (symmetric link between two named classes)
+:MaterialSample a owl:Class ; rdfs:label "material sample"@en ; owl:equivalentClass :Sample .
+
+# ObjectUnionOf
+:CharacterisationTarget a owl:Class ;
+    owl:equivalentClass [ a owl:Class ; owl:unionOf ( :Sample :Substrate ) ] .
+
+# ObjectIntersectionOf + ObjectComplementOf
+:NonCrystallineSolid a owl:Class ;
+    owl:equivalentClass [ a owl:Class ;
+        owl:intersectionOf ( :SolidSample [ a owl:Class ; owl:complementOf :CrystallineSample ] ) ] .
+
+# ObjectOneOf (nominals)
+:StandardInstrument a owl:Class ;
+    owl:equivalentClass [ a owl:Class ; owl:oneOf ( :instrument_XRD1 :instrument_SEM1 ) ] .
+
+# ObjectHasValue
+:AliceSample a owl:Class ;
+    owl:equivalentClass [ a owl:Class ;
+        owl:intersectionOf ( :Sample [ a owl:Restriction ; owl:onProperty :hasOperator ; owl:hasValue :alice ] ) ] .
+
+# ObjectHasSelf
+:SelfCalibratingInstrument a owl:Class ;
+    owl:equivalentClass [ a owl:Class ;
+        owl:intersectionOf ( :Instrument [ a owl:Restriction ; owl:onProperty :calibratedBy ; owl:hasSelf true ] ) ] .
+
+# Exact qualified cardinality
+:Bilayer a owl:Class ;
+    owl:equivalentClass [ a owl:Class ;
+        owl:intersectionOf ( :ThinFilm
+            [ a owl:Restriction ; owl:onProperty :hasComponent ; owl:qualifiedCardinality "2"^^xsd:nonNegativeInteger ; owl:onClass :Layer ] ) ] .
+
+# DataHasValue
+:ReferenceSample a owl:Class ;
+    owl:equivalentClass [ a owl:Class ;
+        owl:intersectionOf ( :Sample [ a owl:Restriction ; owl:onProperty :isReference ; owl:hasValue true ] ) ] .
+
+# Restrictions as superclasses (necessary conditions)
+:Sample
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :measuredBy ;  owl:allValuesFrom :Instrument ] ,                      # ObjectAllValuesFrom
+                    [ a owl:Restriction ; owl:onProperty :hasOperator ; owl:maxCardinality "1"^^xsd:nonNegativeInteger ] ,   # unqualified max
+                    [ a owl:Restriction ; owl:onProperty :measuredBy ;  owl:maxQualifiedCardinality "3"^^xsd:nonNegativeInteger ; owl:onClass :Instrument ] ,
+                    [ a owl:Restriction ; owl:onProperty :hasSampleId ; owl:someValuesFrom xsd:string ] ,                    # DataSomeValuesFrom
+                    [ a owl:Restriction ; owl:onProperty :preparationTemperature ; owl:allValuesFrom :TemperatureKelvin ] , # DataAllValuesFrom
+                    [ a owl:Restriction ; owl:onProperty :state ; owl:allValuesFrom :SampleState ] .
+
+:CoatedSubstrate
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasComponent ; owl:someValuesFrom :Layer ] .                       # ObjectSomeValuesFrom
+
+:ThinFilm
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasComponent ; owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass :Layer ] .
+
+:Layer   # anonymous inverse property expression
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty [ owl:inverseOf :hasComponent ] ; owl:someValuesFrom :ThinFilm ] .
+
+:LabNotebookEntry
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :documents ; owl:cardinality "1"^^xsd:nonNegativeInteger ] ,        # unqualified exact
+                    [ a owl:Restriction ; owl:onProperty :documents ; owl:minCardinality "1"^^xsd:nonNegativeInteger ] .     # unqualified min
+
+:Measurement
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :numericValue ; owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onDataRange xsd:decimal ] ,
+                    [ a owl:Restriction ; owl:onProperty :numericValue ; owl:maxQualifiedCardinality "10"^^xsd:nonNegativeInteger ; owl:onDataRange xsd:decimal ] ,
+                    [ a owl:Restriction ; owl:onProperty :hasUnit ; owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass qudt:Unit ] .
+
+:Person
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :hasName ; owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onDataRange xsd:string ] .
+
+# ── §6 Class axioms ──────────────────────────────────────────────────────────
+
+# DisjointClasses (pairwise)
+:Instrument owl:disjointWith :Person .
+
+# AllDisjointClasses (n-ary)
+[] a owl:AllDisjointClasses ; owl:members ( :Sample :Instrument :Person :Measurement ) .
+
+# DisjointUnion
+:Sample owl:disjointUnionOf ( :SolidSample :LiquidSample :GaseousSample ) .
+
+# General Class Inclusion (anonymous LHS): Sample ⊓ ∃hasComponent.Metal ⊑ ConductiveSample
+:ConductiveSample a owl:Class ; rdfs:label "conductive sample"@en ; rdfs:subClassOf :Sample .
+[ a owl:Class ;
+  owl:intersectionOf ( :Sample [ a owl:Restriction ; owl:onProperty :hasComponent ; owl:someValuesFrom :Metal ] ) ]
+    rdfs:subClassOf :ConductiveSample .
+
+# Unsatisfiable class (≡ owl:Nothing by entailment) — a reasoner should flag it
+:ImpossibleSample a owl:Class ;
+    rdfs:label "impossible sample"@en ;
+    rdfs:subClassOf :Instrument , :Person .
+
+# ── §7 Object property axioms ────────────────────────────────────────────────
+:relatedTo a owl:ObjectProperty ;
+    rdfs:label "related to"@en ;
+    rdfs:subPropertyOf owl:topObjectProperty .         # top property
+
+:hasPart a owl:ObjectProperty , owl:TransitiveProperty ;    # transitive (non-simple)
+    rdfs:label "has part"@en ;
+    rdfs:subPropertyOf :relatedTo ;
+    rdfs:domain :MaterialEntity ;
+    rdfs:range  :MaterialEntity .
+
+:partOf a owl:ObjectProperty ;
+    rdfs:label "part of"@en ;
+    owl:inverseOf :hasPart ;                           # InverseObjectProperties
+    rdfs:subPropertyOf obo:BFO_0000050 .               # external super-property
+
+:hasComponent a owl:ObjectProperty ;                   # simple sub-property → usable in cardinalities
+    rdfs:label "has component"@en ;
+    rdfs:subPropertyOf :hasPart .
+
+:preparedFrom a owl:ObjectProperty , owl:IrreflexiveProperty , owl:AsymmetricProperty ;
+    rdfs:label "prepared from"@en ;
+    rdfs:subPropertyOf :derivedFrom ;
+    rdfs:domain :Sample ; rdfs:range :Sample .
+
+:derivedFrom a owl:ObjectProperty , owl:TransitiveProperty ;
+    rdfs:label "derived from"@en ;
+    rdfs:subPropertyOf prov:wasDerivedFrom ;
+    owl:propertyChainAxiom ( :preparedFrom :preparedFrom ) .   # SubObjectPropertyOf(ObjectPropertyChain)
+
+:sameBatchAs a owl:ObjectProperty , owl:ReflexiveProperty , owl:SymmetricProperty , owl:TransitiveProperty ;
+    rdfs:label "same batch as"@en .
+
+:adjacentTo a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:label "adjacent to"@en .
+
+:measuredBy a owl:ObjectProperty ;
+    rdfs:label "measured by"@en ;
+    rdfs:domain :Sample ;
+    rdfs:range  [ a owl:Class ; owl:unionOf ( :Instrument :Person ) ] ;   # complex range
+    owl:propertyDisjointWith :calibratedBy .           # DisjointObjectProperties (pairwise)
+
+:characterisedBy a owl:ObjectProperty ;
+    rdfs:label "characterised by"@en ;
+    owl:equivalentProperty :measuredBy .               # EquivalentObjectProperties
+
+:calibratedBy a owl:ObjectProperty ; rdfs:label "calibrated by"@en ; rdfs:domain :Instrument .
+
+:hasPrimaryInstrument a owl:ObjectProperty , owl:FunctionalProperty ;
+    rdfs:label "has primary instrument"@en ; rdfs:range :Instrument .
+
+:hasNotebookEntry a owl:ObjectProperty , owl:InverseFunctionalProperty ;
+    rdfs:label "has notebook entry"@en ; rdfs:range :LabNotebookEntry .
+
+:documents a owl:ObjectProperty ; rdfs:label "documents"@en ; rdfs:domain :LabNotebookEntry .
+
+:hasOperator   a owl:ObjectProperty ; rdfs:label "has operator"@en ;   rdfs:range :Person .
+:hasSupervisor a owl:ObjectProperty ; rdfs:label "has supervisor"@en ; rdfs:range :Person .
+:hasReviewer   a owl:ObjectProperty ; rdfs:label "has reviewer"@en ;   rdfs:range :Person .
+[] a owl:AllDisjointProperties ; owl:members ( :hasOperator :hasSupervisor :hasReviewer ) .
+
+:hasUnit a owl:ObjectProperty ; rdfs:label "has unit"@en ; rdfs:range qudt:Unit .   # external range
+
+:usesTechnique a owl:ObjectProperty ; rdfs:label "uses technique"@en ; rdfs:range :Technique .
+
+# ── §8 Data property axioms ──────────────────────────────────────────────────
+:identifier a owl:DatatypeProperty ;
+    rdfs:label "identifier"@en ;
+    rdfs:subPropertyOf owl:topDataProperty ;
+    rdfs:range :IdentifierValue .
+
+:hasSampleId a owl:DatatypeProperty , owl:FunctionalProperty ;   # functional data property
+    rdfs:label "has sample ID"@en ;
+    rdfs:subPropertyOf :identifier ;                   # SubDataPropertyOf
+    rdfs:domain :Sample ; rdfs:range xsd:string .
+
+:sampleCode a owl:DatatypeProperty ;
+    owl:equivalentProperty :hasSampleId .              # EquivalentDataProperties
+
+:preparationTemperature a owl:DatatypeProperty ;
+    rdfs:label "preparation temperature"@en ; rdfs:range :TemperatureKelvin .
+
+:measurementTemperature a owl:DatatypeProperty ;
+    rdfs:label "measurement temperature"@en ;
+    owl:propertyDisjointWith :preparationTemperature . # DisjointDataProperties (pairwise)
+
+:state       a owl:DatatypeProperty ; rdfs:range :SampleState .
+:pH          a owl:DatatypeProperty ; rdfs:range :PHValue .
+:isReference a owl:DatatypeProperty ; rdfs:range xsd:boolean .
+:numericValue a owl:DatatypeProperty ; rdfs:range xsd:decimal .
+:hasName     a owl:DatatypeProperty ; rdfs:range xsd:string .
+:preparedAt  a owl:DatatypeProperty ; rdfs:range xsd:dateTime .
+:massMg      a owl:DatatypeProperty ; rdfs:range xsd:double .
+:layerCount  a owl:DatatypeProperty ; rdfs:range xsd:positiveInteger .
+[] a owl:AllDisjointProperties ; owl:members ( :massMg :layerCount :pH ) .
+
+# ── §9 Keys ──────────────────────────────────────────────────────────────────
+:Sample owl:hasKey ( :hasSampleId ) .
+:Person owl:hasKey ( :hasName :hasOperator ) .         # mixed data + object key
+
+# ── §10 Individuals & assertions ─────────────────────────────────────────────
+:alice a owl:NamedIndividual , :Person ; rdfs:label "Alice" ; :hasName "Alice Example" .
+:bob   a owl:NamedIndividual , :Person ; rdfs:label "Bob" ;   :hasName "Bob Example" .
+:alice owl:differentFrom :bob .                        # DifferentIndividuals (pairwise)
+
+:instrument_XRD1 a owl:NamedIndividual , :Instrument ;
+    rdfs:label "XRD diffractometer #1"@en ;
+    :calibratedBy :instrument_XRD1 ;                   # makes it a SelfCalibratingInstrument
+    :usesTechnique :XRD .
+:instrument_SEM1 a owl:NamedIndividual , :Instrument ; rdfs:label "SEM #1"@en .
+
+:sample_001 a owl:NamedIndividual , :SingleCrystal ;   # ClassAssertion
+    rdfs:label "Sample 001"@en ;
+    :hasSampleId "S-001" ;                             # DataPropertyAssertion (plain string)
+    :preparationTemperature "773.15"^^xsd:decimal ;    # must satisfy :TemperatureKelvin (≥ 0)
+    :preparedAt "2026-10-01T09:30:00+02:00"^^xsd:dateTime ;
+    :massMg "12.5"^^xsd:double ;
+    :pH "7.0"^^xsd:decimal ;
+    :state "solid" ;
+    :isReference true ;
+    :hasOperator :alice ;                              # ObjectPropertyAssertion
+    :measuredBy :instrument_XRD1 ;
+    :hasPrimaryInstrument :instrument_XRD1 ;
+    :hasNotebookEntry :entry_42 .
+
+:sample_002 a owl:NamedIndividual , :CoatedSubstrate ;
+    :hasSampleId "S-002" ;
+    :preparedFrom :sample_001 ;
+    :hasComponent :layer_A ;
+    :sameBatchAs :sample_001 ;
+    :adjacentTo :wafer_A ;
+    :hasOperator :bob ;
+    :hasReviewer :alice .
+
+:sample_003 a owl:NamedIndividual , :Sample ;
+    :hasSampleId "S-003" ;
+    :preparedFrom :sample_002 .                        # chain ⇒ sample_003 derivedFrom sample_001
+
+:wafer_A a owl:NamedIndividual , :Substrate ; rdfs:label "Wafer A"@en .
+:layer_A a owl:NamedIndividual , :Layer ; :layerCount 1 .
+:entry_42 a owl:NamedIndividual , :LabNotebookEntry ; :documents :sample_001 .
+
+:measurement_001 a owl:NamedIndividual , :Measurement ;
+    :numericValue 3.14 ;
+    :measurementTemperature 298.15 ;
+    :hasUnit <http://qudt.org/vocab/unit/K> .          # external individual
+
+:S-001-legacy a owl:NamedIndividual ; owl:sameAs :sample_001 .   # SameIndividual
+
+[] a owl:AllDifferent ; owl:distinctMembers ( :sample_001 :sample_002 :sample_003 :wafer_A ) .
+
+# Anonymous individual (blank node) in an assertion
+:sample_003 :measuredBy [ a :Instrument ; rdfs:label "borrowed spectrometer"@en ] .
+
+# NegativeObjectPropertyAssertion
+[] a owl:NegativePropertyAssertion ;
+    owl:sourceIndividual  :sample_002 ;
+    owl:assertionProperty :measuredBy ;
+    owl:targetIndividual  :instrument_SEM1 .
+
+# NegativeDataPropertyAssertion
+[] a owl:NegativePropertyAssertion ;
+    owl:sourceIndividual  :sample_001 ;
+    owl:assertionProperty :hasSampleId ;
+    owl:targetValue       "S-999" .
+
+# ── §11 Axiom annotations (reified axioms) ───────────────────────────────────
+[] a owl:Axiom ;
+    owl:annotatedSource   :CoatedSubstrate ;
+    owl:annotatedProperty rdfs:subClassOf ;
+    owl:annotatedTarget   :Substrate ;
+    rdfs:comment   "Coated substrates are still substrates for handling rules."@en ;
+    dcterms:source <https://example.org/lab-handbook#sec-3> .
+
+[] a owl:Axiom ;
+    owl:annotatedSource   :sample_002 ;
+    owl:annotatedProperty :preparedFrom ;
+    owl:annotatedTarget   :sample_001 ;
+    rdfs:comment "Recorded by Bob on 2026-10-02."@en .
+
+# ── §12 Edge cases ───────────────────────────────────────────────────────────
+
+# Deprecated class and property, with replacement pointer
+:OldSampleType a owl:Class ;
+    rdfs:label "old sample type"@en ;
+    owl:deprecated true ;
+    dcterms:isReplacedBy :Sample ;
+    rdfs:subClassOf :Sample .
+:oldOperator a owl:ObjectProperty ;
+    owl:deprecated true ;
+    dcterms:isReplacedBy :hasOperator .
+
+# Punning: :XRD is both a class and an individual
+:XRD a owl:Class ;
+    rdfs:label "X-ray diffraction"@en ;
+    rdfs:subClassOf :Measurement .
+:XRD a owl:NamedIndividual , :Technique .
+
+# Dangling reference: :UndeclaredThing is used but never declared
+:DanglingChild a owl:Class ; rdfs:label "dangling child"@en ; rdfs:subClassOf :UndeclaredThing .
+
+# Bottom/top entities used explicitly
+:ImpossibleSample rdfs:subClassOf owl:Nothing .
+:neverRelated a owl:ObjectProperty ; rdfs:subPropertyOf owl:bottomObjectProperty .
+:MaterialEntity rdfs:subClassOf owl:Thing .
+
+# Labels: missing label (IRI fallback), multi-language, and long text
+:Unlabelled a owl:Class ; rdfs:subClassOf :Sample .
+:Sample skos:altLabel "Muster"@de , "échantillon"@fr .
