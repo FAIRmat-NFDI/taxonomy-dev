@@ -1,4 +1,4 @@
-# Production setup: GitHub Pages + Render
+#Setup: GitHub Pages + Render ( for dev + prod)
 
 This guide takes the repository from "pushed to GitHub" to a running FAIRTaxonomy:
 

@@ -2,7 +2,8 @@
 # FAIRTaxonomy IAM — Keycloak start-up.
 #
 #   KC_COMMAND=start-dev (default)  local development: H2 database, HTTP, development defaults
-#   KC_COMMAND=start                production (Render): Postgres, behind a TLS proxy, secrets required
+#   KC_COMMAND=start                production (Render): Postgres, behind a TLS proxy, secrets required;
+#                                   runs the pre-built image (`start --optimized`, see Dockerfile)
 #
 # The realm file (realm/fairtaxonomy.json) is imported once, on first start. It reads
 # KC_CLIENT_SECRET and CORE_PUBLIC_URL from the environment (Keycloak placeholders).
@@ -35,6 +36,8 @@ case "$MODE" in
     export KC_PROXY_HEADERS="${KC_PROXY_HEADERS:-xforwarded}"
     export KC_HTTP_ENABLED="${KC_HTTP_ENABLED:-true}"
     export KC_BOOTSTRAP_ADMIN_USERNAME="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
+    echo "[iam] production start: database $KC_DB, hostname $KC_HOSTNAME, realm import from CORE_PUBLIC_URL=$CORE_PUBLIC_URL"
+    exec /opt/keycloak/bin/kc.sh start --optimized --import-realm "$@"
     ;;
   start-dev)
     export KC_BOOTSTRAP_ADMIN_USERNAME="${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}"
