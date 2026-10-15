@@ -1,0 +1,60 @@
+# backend/iam → Render (Docker web service running Keycloak, with Render Postgres).
+# Builds the image first (catches Dockerfile errors), then pushes the IAM settings from GitHub
+# to Render and deploys. Production refuses development secrets (see backend/iam/docker/entrypoint.sh).
+name: iam
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/iam/**', '.github/workflows/iam.yml', '.github/scripts/render-deploy.mjs']
+  pull_request:
+    paths: ['backend/iam/**', '.github/workflows/iam.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iam-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the realm file and the start script
+        run: |
+          python3 -m json.tool backend/iam/docker/realm/fairtaxonomy.json > /dev/null
+          bash -n backend/iam/docker/entrypoint.sh
+      - name: Build the image
+        run: docker build -t fairtaxonomy-iam backend/iam/docker
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.RENDER_IAM_SERVICE_ID != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sync configuration to Render and deploy
+        run: node .github/scripts/render-deploy.mjs
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_IAM_SERVICE_ID }}
+          DEPLOY_TIMEOUT_MIN: '30'
+          RENDER_ENV_KEYS: >-
+            KC_COMMAND, KC_HOSTNAME=IAM_URL, KC_BOOTSTRAP_ADMIN_USERNAME=IAM_ADMIN_USER,
+            KC_BOOTSTRAP_ADMIN_PASSWORD=IAM_ADMIN_PASSWORD, KC_CLIENT_SECRET=KEYCLOAK_CLIENT_SECRET,
+            CORE_PUBLIC_URL=CORE_URL
+          KC_COMMAND: start
+          IAM_URL: ${{ vars.IAM_URL }}
+          IAM_ADMIN_USER: ${{ vars.IAM_ADMIN_USER || 'admin' }}
+          IAM_ADMIN_PASSWORD: ${{ secrets.IAM_ADMIN_PASSWORD }}
+          KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+          CORE_URL: ${{ vars.CORE_URL }}

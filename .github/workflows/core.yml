@@ -1,0 +1,108 @@
+# backend/core → Render (Node web service).
+# GitHub is the source of truth for configuration: Secrets / Variables of the "production"
+# environment are pushed to the Render service on every deploy, then the tested commit is deployed.
+# See docs/RENDER.md for the list of settings.
+name: core
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/core/**', '.github/workflows/core.yml', '.github/scripts/render-deploy.mjs']
+  pull_request:
+    paths: ['backend/core/**', '.github/workflows/core.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/core/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.RENDER_CORE_SERVICE_ID != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Derive defaults from the repository
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IAM_URL: ${{ vars.IAM_URL }}
+          KEYCLOAK_ISSUER: ${{ vars.KEYCLOAK_ISSUER }}
+          HELMHOLTZ_CLIENT_ID: ${{ vars.HELMHOLTZ_CLIENT_ID }}
+          OIDC_PROVIDERS: ${{ vars.OIDC_PROVIDERS }}
+          REGISTRATION: ${{ vars.REGISTRATION }}
+        run: |
+          # GitHub Pages origin of this repository (lower-case host)
+          echo "PAGES_ORIGIN=https://${OWNER,,}.github.io" >> "$GITHUB_ENV"
+          # Keycloak: own IAM service on Render, unless an external issuer (e.g. NOMAD's) is given
+          issuer="${KEYCLOAK_ISSUER:-${IAM_URL:+${IAM_URL%/}/realms/fairtaxonomy}}"
+          echo "KC_ISSUER=$issuer" >> "$GITHUB_ENV"
+          providers="$OIDC_PROVIDERS"
+          if [ -z "$providers" ]; then
+            providers=""
+            [ -n "$HELMHOLTZ_CLIENT_ID" ] && providers="helmholtz"
+            [ -n "$issuer" ] && providers="${providers:+$providers,}keycloak"
+          fi
+          echo "PROVIDERS=${providers:-off}" >> "$GITHUB_ENV"
+          if [ -n "$issuer" ]; then echo "PASSWORD_PROVIDER=keycloak" >> "$GITHUB_ENV"; else echo "PASSWORD_PROVIDER=off" >> "$GITHUB_ENV"; fi
+          if [ -n "$issuer" ] && [ "$REGISTRATION" != "off" ]; then echo "REGISTRATION_PROVIDER=keycloak" >> "$GITHUB_ENV"; else echo "REGISTRATION_PROVIDER=off" >> "$GITHUB_ENV"; fi
+
+      - name: Sync configuration to Render and deploy
+        run: node .github/scripts/render-deploy.mjs
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_CORE_SERVICE_ID }}
+          # Render variable [= source env var below]
+          RENDER_ENV_KEYS: >-
+            NODE_ENV, PUBLIC_URL, FRONTEND_ORIGINS, SESSION_SECRET,
+            GITHUB_CLIENT_ID=GH_APP_CLIENT_ID, GITHUB_CLIENT_SECRET=GH_APP_CLIENT_SECRET,
+            GITHUB_APP_ID=GH_APP_ID, GITHUB_APP_PRIVATE_KEY=GH_APP_PRIVATE_KEY,
+            GITHUB_PROXY_REPOS=PROXY_REPOS,
+            OIDC_PROVIDERS=PROVIDERS,
+            OIDC_HELMHOLTZ_LABEL, OIDC_HELMHOLTZ_ISSUER, OIDC_HELMHOLTZ_CLIENT_ID, OIDC_HELMHOLTZ_CLIENT_SECRET,
+            OIDC_KEYCLOAK_LABEL, OIDC_KEYCLOAK_ISSUER=KC_ISSUER, OIDC_KEYCLOAK_CLIENT_ID,
+            OIDC_KEYCLOAK_CLIENT_SECRET, OIDC_KEYCLOAK_BUTTON,
+            PASSWORD_PROVIDER, REGISTRATION_PROVIDER, REGISTRATION_RATE_LIMIT
+          NODE_ENV: production
+          PUBLIC_URL: ${{ vars.CORE_URL }}
+          FRONTEND_ORIGINS: ${{ vars.FRONTEND_ORIGINS || env.PAGES_ORIGIN }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          GH_APP_CLIENT_ID: ${{ vars.GH_APP_CLIENT_ID }}
+          GH_APP_CLIENT_SECRET: ${{ secrets.GH_APP_CLIENT_SECRET }}
+          GH_APP_ID: ${{ vars.GH_APP_ID }}
+          GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          PROXY_REPOS: ${{ vars.PROXY_REPOS || github.repository }}
+          OIDC_HELMHOLTZ_LABEL: Helmholtz ID
+          OIDC_HELMHOLTZ_ISSUER: ${{ vars.HELMHOLTZ_ISSUER || 'https://login.helmholtz.de/oauth2' }}
+          OIDC_HELMHOLTZ_CLIENT_ID: ${{ vars.HELMHOLTZ_CLIENT_ID }}
+          OIDC_HELMHOLTZ_CLIENT_SECRET: ${{ secrets.HELMHOLTZ_CLIENT_SECRET }}
+          OIDC_KEYCLOAK_LABEL: Email & password
+          OIDC_KEYCLOAK_CLIENT_ID: ${{ vars.KEYCLOAK_CLIENT_ID || 'fairtaxonomy-backend' }}
+          OIDC_KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+          OIDC_KEYCLOAK_BUTTON: 'false'
+          REGISTRATION_RATE_LIMIT: ${{ vars.REGISTRATION_RATE_LIMIT || '10' }}
