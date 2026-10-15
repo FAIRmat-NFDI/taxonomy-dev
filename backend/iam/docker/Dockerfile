@@ -14,8 +14,12 @@ COPY entrypoint.sh /opt/keycloak/bin/fairtaxonomy-entrypoint.sh
 RUN mkdir -p /opt/keycloak/data/h2
 
 ENV KC_HTTP_PORT=8080 \
-    KC_HEALTH_ENABLED=true \
-    JAVA_OPTS_KC_HEAP="-XX:MaxRAMPercentage=65"
+    JAVA_OPTS_KC_HEAP="-Xms64m -Xmx192m" \
+    JAVA_OPTS_APPEND="-XX:MaxMetaspaceSize=176m -XX:ReservedCodeCacheSize=40m -XX:MaxDirectMemorySize=32m -Xss256k -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1" \
+    KC_HTTP_POOL_MAX_THREADS=8 \
+    KC_DB_POOL_INITIAL_SIZE=1 \
+    KC_DB_POOL_MIN_SIZE=1 \
+    KC_DB_POOL_MAX_SIZE=5
 
 EXPOSE 8080
 # Run through bash, so the script needs no execute bit (works with the legacy Docker builder too).
