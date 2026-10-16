@@ -100,6 +100,18 @@ async function refreshGitHubToken(session: Session): Promise<void> {
   updateSession(tokens);
 }
 
+/**
+ * Before a write: refreshes the GitHub user token if it is about to expire (GitHub App tokens
+ * last 8 h). No-op for other sessions. Throws UNAUTHENTICATED when the session can't be renewed.
+ */
+export async function ensureFreshSession(): Promise<void> {
+  const session = getSession();
+  if (!session || session.mode !== 'direct' || session.expiresAt === undefined) return;
+  if (session.expiresAt - EXPIRY_SKEW_MS >= Date.now()) return;
+  if (!session.refreshToken) throw new AppError('UNAUTHENTICATED', 'Your GitHub sign-in has expired. Please sign in again.');
+  await refreshGitHubToken(session);
+}
+
 /** Resumes a stored session after a reload; validates (and refreshes) it, or clears it. */
 export async function restoreSession(): Promise<SessionInfo | null> {
   const stored = loadStoredSession();

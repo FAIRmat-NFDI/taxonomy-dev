@@ -20,6 +20,7 @@ export function githubTarget(session: Session | null = getSession()): ApiTarget 
 export const gh = {
   get: <T>(path: string, query?: Query) => request<T>(githubTarget(), 'GET', path, { query }),
   post: <T>(path: string, body: unknown) => request<T>(githubTarget(), 'POST', path, { body }),
+  patch: <T>(path: string, body: unknown) => request<T>(githubTarget(), 'PATCH', path, { body }),
 };
 
 /** "owner/repo" path prefix with each part URL-encoded. */

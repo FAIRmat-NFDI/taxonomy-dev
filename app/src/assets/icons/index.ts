@@ -28,6 +28,16 @@ import TreeLeafSvg from './tree-leaf.svg?react';
 import TreeViewSvg from './tree-view.svg?react';
 import ZoomInSvg from './zoom-in.svg?react';
 import ZoomOutSvg from './zoom-out.svg?react';
+import FormatHeadingSvg from './format-heading.svg?react';
+import FormatBoldSvg from './format-bold.svg?react';
+import FormatItalicSvg from './format-italic.svg?react';
+import FormatQuoteSvg from './format-quote.svg?react';
+import FormatLinkSvg from './format-link.svg?react';
+import FormatBulletedSvg from './format-bulleted.svg?react';
+import FormatNumberedSvg from './format-numbered.svg?react';
+import FormatTasksSvg from './format-tasks.svg?react';
+import IssueAddSvg from './issue-add.svg?react';
+import IssueClosedSvg from './issue-closed.svg?react';
 import { createAssetIcon } from './createAssetIcon';
 
 export const BranchIcon = createAssetIcon(BranchSvg, 'BranchIcon');
@@ -64,3 +74,18 @@ export const TreeLeafIcon = createAssetIcon(TreeLeafSvg, 'TreeLeafIcon');
 export const TreeViewIcon = createAssetIcon(TreeViewSvg, 'TreeViewIcon');
 export const ZoomInIcon = createAssetIcon(ZoomInSvg, 'ZoomInIcon');
 export const ZoomOutIcon = createAssetIcon(ZoomOutSvg, 'ZoomOutIcon');
+/** Markdown editor toolbar. */
+export const FormatHeadingIcon = createAssetIcon(FormatHeadingSvg, 'FormatHeadingIcon');
+export const FormatBoldIcon = createAssetIcon(FormatBoldSvg, 'FormatBoldIcon');
+export const FormatItalicIcon = createAssetIcon(FormatItalicSvg, 'FormatItalicIcon');
+export const FormatQuoteIcon = createAssetIcon(FormatQuoteSvg, 'FormatQuoteIcon');
+export const FormatLinkIcon = createAssetIcon(FormatLinkSvg, 'FormatLinkIcon');
+export const FormatBulletedIcon = createAssetIcon(FormatBulletedSvg, 'FormatBulletedIcon');
+export const FormatNumberedIcon = createAssetIcon(FormatNumberedSvg, 'FormatNumberedIcon');
+export const FormatTasksIcon = createAssetIcon(FormatTasksSvg, 'FormatTasksIcon');
+/** Create a new issue. */
+export const IssueAddIcon = createAssetIcon(IssueAddSvg, 'IssueAddIcon');
+/** Close an issue (closed state). */
+export const IssueClosedIcon = createAssetIcon(IssueClosedSvg, 'IssueClosedIcon');
+/** Show / hide more (rotated 180° when open). */
+export const ExpandMoreIcon = createAssetIcon(ChevronDownSvg, 'ExpandMoreIcon');

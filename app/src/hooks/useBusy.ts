@@ -1,5 +1,5 @@
 import { useCallback, useId } from 'react';
-import { useIsFetching, useIsMutating } from '@tanstack/react-query';
+import { useIsFetching, useMutationState } from '@tanstack/react-query';
 import { busyEnded, busyStarted, selectAuth, selectBusyTasks, selectOntology, useAppDispatch, useAppSelector } from '@/store';
 
 /** Marks a non-network task (e.g. a graph layout) as running, so the busy overlay shows. */
@@ -21,12 +21,13 @@ export function useBusy(): { label: string | null; local: boolean } {
   const auth = useAppSelector(selectAuth);
   const tasks = useAppSelector(selectBusyTasks);
   const fetching = useIsFetching();
-  const mutating = useIsMutating();
+  // A mutation may name itself via `meta: { busyLabel }` (e.g. "Creating issue…").
+  const mutating = useMutationState({ filters: { status: 'pending' }, select: (m) => (m.meta?.busyLabel as string | undefined) ?? 'Saving…' });
 
   const local = Object.values(tasks)[0];
   if (ontology.status === 'loading') return { label: 'Loading ontology…', local: false };
   if (auth.status === 'exchanging' || auth.status === 'signingIn') return { label: 'Signing in…', local: false };
-  if (mutating) return { label: 'Saving…', local: false };
+  if (mutating.length) return { label: mutating[0]!, local: false };
   if (local) return { label: local, local: true };
   if (fetching) return { label: 'Loading…', local: false };
   return { label: null, local: false };

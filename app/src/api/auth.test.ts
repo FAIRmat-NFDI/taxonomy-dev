@@ -140,4 +140,57 @@ describe('auth + GitHub routing', () => {
     expect(url.searchParams.get('returnTo')).toBe('http://localhost:5173/auth/callback?next=%2Fgraph');
     expect(session.map.get('tp.auth.remember')).toBe('1');
   });
+  it('GitHub sign-in: refreshes an expiring token before creating an issue, and stores the anchor', async () => {
+    const { setSession } = await import('./session');
+    setSession(
+      { mode: 'direct', provider: 'github', providerLabel: 'GitHub', user: { id: '7', login: 'hari', providerLabel: 'GitHub' }, accessToken: 'old', refreshToken: 'ghr_1', expiresAt: Date.now() + 1000 },
+      false,
+    );
+    fetchMock
+      .mockReturnValueOnce(reply({ accessToken: 'new', refreshToken: 'ghr_2', expiresAt: Date.now() + 8 * 3600e3 }))
+      .mockReturnValueOnce(
+        reply({ number: 42, title: 'Typo', body: 'x', state: 'open', html_url: 'https://github.com/FAIRmat-NFDI/ontology/issues/42', created_at: 'now', user: { login: 'hari' } }, 201),
+      );
+
+    await auth.ensureFreshSession();
+    const anchor = { filePath: 'main.ttl', entityIri: 'https://ex.org#Sample', lineStart: 10, lineEnd: 14, ref: 'abc1234' };
+    const thread = await issues.createThread({ title: 'Typo', body: '> **Reference:** …\n\nFix it', anchor });
+
+    expect(calls()).toEqual([
+      { url: 'https://api.example.org/auth/github/refresh', method: 'POST', auth: undefined },
+      { url: 'https://api.github.com/repos/FAIRmat-NFDI/ontology/issues', method: 'POST', auth: 'Bearer new' },
+    ]);
+    const sent = JSON.parse(fetchMock.mock.calls[1]![1].body);
+    expect(sent.title).toBe('Typo');
+    expect(sent.body).toContain('Fix it');
+    expect(sent.body).toContain(`<!-- fairtaxonomy:anchor ${JSON.stringify(anchor)} -->`);
+    expect(thread).toMatchObject({ id: 42, url: 'https://github.com/FAIRmat-NFDI/ontology/issues/42' });
+  });
+
+  it('explains GitHub errors when creating an issue', async () => {
+    const { AppError } = await import('./errors');
+    expect(issues.issueErrorMessage(new AppError('FORBIDDEN', 'x', { message: 'Resource not accessible by integration' }))).toMatch(/GitHub App is not installed/);
+    expect(issues.issueErrorMessage(new AppError('UNKNOWN', 'Issues are disabled for this repo'))).toMatch(/Issues are disabled/);
+    expect(issues.issueErrorMessage(new AppError('UNAUTHENTICATED', 'Bad credentials'))).toMatch(/sign in again/);
+    expect(issues.issueErrorMessage(new AppError('NOT_FOUND', 'Not Found'))).toMatch(/not found/);
+  });
+  it('GitHub sign-in: lists and adds comments, closes an issue', async () => {
+    fetchMock.mockReturnValueOnce(reply({ id: 7, login: 'hari', name: 'Hari', avatar_url: 'a' }));
+    await auth.signInWithToken('ghu_x', false);
+    const c = (id: number) => ({ id, body: `c${id}`, html_url: `u${id}`, created_at: 'now', user: { login: 'hari', avatar_url: 'a', html_url: 'p' } });
+    fetchMock
+      .mockReturnValueOnce(reply([c(1), c(2)]))
+      .mockReturnValueOnce(reply(c(3), 201))
+      .mockReturnValueOnce(reply({ number: 5, title: 'T', body: '', state: 'closed', html_url: 'u', created_at: 'now', user: { login: 'hari' } }));
+
+    expect((await issues.listComments(5)).map((x) => x.body)).toEqual(['c1', 'c2']);
+    expect(await issues.addComment(5, 'hello')).toMatchObject({ id: 3, author: 'hari' });
+    expect(await issues.closeThread(5)).toMatchObject({ id: 5, state: 'closed' });
+
+    const [, list, post, patch] = calls();
+    expect(list!.url).toBe('https://api.github.com/repos/FAIRmat-NFDI/ontology/issues/5/comments?per_page=100&page=1');
+    expect(post).toMatchObject({ url: 'https://api.github.com/repos/FAIRmat-NFDI/ontology/issues/5/comments', method: 'POST', auth: 'Bearer ghu_x' });
+    expect(patch).toMatchObject({ url: 'https://api.github.com/repos/FAIRmat-NFDI/ontology/issues/5', method: 'PATCH' });
+    expect(JSON.parse(fetchMock.mock.calls[3]![1].body)).toEqual({ state: 'closed', state_reason: 'completed' });
+  });
 });

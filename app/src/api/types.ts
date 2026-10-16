@@ -282,9 +282,26 @@ export interface CommentThread {
   id: number;
   title: string;
   body: string;
+  /** GitHub login (the user id shown in the UI). */
   author: string;
+  authorAvatarUrl?: string;
+  authorUrl?: string;
   state: 'open' | 'closed';
   url: string;
   createdAt: string;
+  /** Number of comments on the issue. */
+  comments: number;
   anchor: CommentAnchor | null;
+}
+
+/** A comment on an issue (GitHub issue comment). */
+export interface IssueComment {
+  id: number;
+  /** GitHub login. */
+  author: string;
+  authorAvatarUrl?: string;
+  authorUrl?: string;
+  body: string;
+  createdAt: string;
+  url: string;
 }
