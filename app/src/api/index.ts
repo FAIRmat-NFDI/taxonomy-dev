@@ -12,6 +12,8 @@ export { githubTarget } from './github/client';
 export { parseTurtle } from './rdf/parser';
 export { materialize, compactIri } from './rdf/materialize';
 export { materializeTurtle } from './rdf/engine';
+export { runSparql } from './rdf/sparql';
+export { queryErrorMessage, toSparqlResult, withPrefixes, type SparqlResult } from './rdf/sparqlResult';
 export { buildOntologyGraph, graphRootFor, type EdgeRelation, type GraphEdge, type GraphNode, type GraphNodeKind, type OntologyGraph } from './rdf/graph';
 export { annotationsOf, type AnnotationGroup } from './rdf/annotations';
 export { axiomsFor, renderAxiom, INCOMING_LIMIT, type Axiom, type NodeAxiom, type Notation, type Token } from './rdf/axioms';

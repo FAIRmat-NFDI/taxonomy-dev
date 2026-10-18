@@ -38,6 +38,7 @@ import FormatNumberedSvg from './format-numbered.svg?react';
 import FormatTasksSvg from './format-tasks.svg?react';
 import IssueAddSvg from './issue-add.svg?react';
 import IssueClosedSvg from './issue-closed.svg?react';
+import RunSvg from './run.svg?react';
 import { createAssetIcon } from './createAssetIcon';
 
 export const BranchIcon = createAssetIcon(BranchSvg, 'BranchIcon');
@@ -89,3 +90,7 @@ export const IssueAddIcon = createAssetIcon(IssueAddSvg, 'IssueAddIcon');
 export const IssueClosedIcon = createAssetIcon(IssueClosedSvg, 'IssueClosedIcon');
 /** Show / hide more (rotated 180° when open). */
 export const ExpandMoreIcon = createAssetIcon(ChevronDownSvg, 'ExpandMoreIcon');
+/** Open the same entity in another view (e.g. /graph → /doc). */
+export const OpenInViewIcon = createAssetIcon(FormatLinkSvg, 'OpenInViewIcon');
+/** Run (e.g. a SPARQL query). */
+export const RunIcon = createAssetIcon(RunSvg, 'RunIcon');
