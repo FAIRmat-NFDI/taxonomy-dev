@@ -1,7 +1,14 @@
 import { useState, type ReactNode } from 'react';
-import { Box, IconButton, Paper, Stack, Tooltip, useMediaQuery, useTheme } from '@mui/material';
+import { Box, IconButton, Paper, Stack, Tooltip, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { Group, Panel, Separator, useDefaultLayout, usePanelCallbackRef, type LayoutStorage } from 'react-resizable-panels';
+import {
+  Group,
+  Panel,
+  Separator,
+  useDefaultLayout,
+  usePanelCallbackRef,
+  type LayoutStorage,
+} from 'react-resizable-panels';
 import { PaneExpandIcon } from '@/assets';
 import { layout } from '@/theme';
 
@@ -23,7 +30,8 @@ interface PaneLayoutProps {
   /** Column 2. */
   main: { label: string; content: ReactNode };
   /** Column 3: one or more blocks, stacked. Collapsible to a rail on desktop; below the main pane on smaller screens. */
-  aside: { blocks: AsideBlock[]; expandLabel: string };
+  /** `railTitle`: shown turned −90° on the collapsed rail (reads bottom to top). */
+  aside: { blocks: AsideBlock[]; expandLabel: string; railTitle?: string };
 }
 
 const { gap, radius, elevation } = layout.docPane;
@@ -92,8 +100,20 @@ type PaneShape = 'sidebar' | 'card' | 'bottom';
  * A pane card: header stays, body scrolls (see PanelBody).
  * `sidebar` = flush (no radius); `bottom` = open at the bottom edge of the page; `card` = rounded all round.
  */
-export function Pane({ label, component, shape = 'bottom', children }: { label: string; component: 'nav' | 'article' | 'aside' | 'section'; shape?: PaneShape; children: ReactNode }) {
-  const corners = { sidebar: 0, card: `${radius * 4}px`, bottom: `${radius * 4}px ${radius * 4}px 0 0` }[shape];
+export function Pane({
+  label,
+  component,
+  shape = 'bottom',
+  children,
+}: {
+  label: string;
+  component: 'nav' | 'article' | 'aside' | 'section';
+  shape?: PaneShape;
+  children: ReactNode;
+}) {
+  const corners = { sidebar: 0, card: `${radius * 4}px`, bottom: `${radius * 4}px ${radius * 4}px 0 0` }[
+    shape
+  ];
   return (
     <Paper
       component={component}
@@ -152,7 +172,12 @@ export function PaneLayout({ id, columns, sidebar, main, aside }: PaneLayoutProp
   }
 
   return (
-    <Group orientation="horizontal" defaultLayout={saved.defaultLayout} onLayoutChanged={saved.onLayoutChanged} style={{ height: '100%' }}>
+    <Group
+      orientation="horizontal"
+      defaultLayout={saved.defaultLayout}
+      onLayoutChanged={saved.onLayoutChanged}
+      style={{ height: '100%' }}
+    >
       <Panel id="sidebar" defaultSize={percent(columns.sidebar)} minSize="15%">
         <Pane component="nav" label={sidebar.label} shape="sidebar">
           {sidebar.content}
@@ -178,20 +203,60 @@ export function PaneLayout({ id, columns, sidebar, main, aside }: PaneLayoutProp
       >
         <Box sx={{ height: '100%', pt: gap.md, pr: gap.md }}>
           {asideCollapsed ? (
-            <Paper variant="elevation" elevation={elevation} sx={{ height: '100%', p: 0.5, borderRadius: `${radius * 4}px ${radius * 4}px 0 0` }}>
-              <Tooltip title={aside.expandLabel} placement="left">
-                <IconButton aria-label={aside.expandLabel} onClick={expandAside}>
-                  <PaneExpandIcon />
-                </IconButton>
-              </Tooltip>
+            <Paper
+              variant="elevation"
+              elevation={elevation}
+              sx={{ height: '100%', p: 0.5, borderRadius: `${radius * 4}px ${radius * 4}px 0 0` }}
+            >
+              <Stack sx={{ alignItems: 'center', height: '100%' }}>
+                <Tooltip title={aside.expandLabel} placement="left">
+                  <IconButton aria-label={aside.expandLabel} onClick={expandAside}>
+                    <PaneExpandIcon />
+                  </IconButton>
+                </Tooltip>
+                {aside.railTitle && (
+                  // Centred in the rail; rotated −90° (vertical writing, flipped so it reads bottom to top).
+                  <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+                    <Typography
+                      variant="subtitle1"
+                      component="span"
+                      color="text.secondary"
+                      noWrap
+                      onClick={expandAside}
+                      sx={{
+                        writingMode: 'vertical-rl',
+                        transform: 'rotate(180deg)',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      }}
+                    >
+                      {aside.railTitle}
+                    </Typography>
+                  </Box>
+                )}
+              </Stack>
             </Paper>
           ) : (
             // Stacked blocks share the height; the gaps between them are drag handles (heights remembered).
-            <Group orientation="vertical" defaultLayout={savedBlocks.defaultLayout} onLayoutChanged={savedBlocks.onLayoutChanged} style={{ height: '100%' }}>
+            <Group
+              orientation="vertical"
+              defaultLayout={savedBlocks.defaultLayout}
+              onLayoutChanged={savedBlocks.onLayoutChanged}
+              style={{ height: '100%' }}
+            >
               {blocks.flatMap((block, i) => [
                 ...(i > 0 ? [<StackResizeHandle key={`handle-${i}`} />] : []),
-                <Panel key={block.label} id={blockIds[i]} defaultSize={`${Math.round(100 / blocks.length)}%`} minSize="15%">
-                  <Pane component="aside" label={block.label} shape={i === blocks.length - 1 ? 'bottom' : 'card'}>
+                <Panel
+                  key={block.label}
+                  id={blockIds[i]}
+                  defaultSize={`${Math.round(100 / blocks.length)}%`}
+                  minSize="15%"
+                >
+                  <Pane
+                    component="aside"
+                    label={block.label}
+                    shape={i === blocks.length - 1 ? 'bottom' : 'card'}
+                  >
                     {block.content(i === 0 ? collapseAside : undefined)}
                   </Pane>
                 </Panel>,

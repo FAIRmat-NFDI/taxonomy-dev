@@ -5,6 +5,7 @@ import { CloseIcon, FullscreenIcon } from '@/assets';
 import { GraphCanvas } from './GraphCanvas';
 import { GraphControls } from './GraphControls';
 import { GraphLegend } from './GraphLegend';
+import { filterElements, useGraphFilter } from './graphFilter';
 import { createGraphIndex, DEFAULT_DEPTH, MAX_NODES, neighbourhood, type Direction } from './neighbourhood';
 
 interface NeighbourhoodGraphProps {
@@ -34,11 +35,18 @@ export default function NeighbourhoodGraph({ model, nodeId, onSelect }: Neighbou
   const isPhone = useMediaQuery(theme.breakpoints.down('sm'), { noSsr: true });
 
   const view = useMemo(() => (rootId ? neighbourhood(index, rootId, direction, depth) : null), [index, rootId, direction, depth]);
+  // Legend chips filter by node / link kind (classes only at first); the centre node always stays.
+  const legendFilter = useGraphFilter();
+  const elements = useMemo(() => (view ? filterElements(view.elements, legendFilter.filter, [rootId]) : []), [view, legendFilter.filter, rootId]);
   if (!rootId || !view) return null;
+  const nodeCount = elements.filter((e) => e.group === 'nodes').length;
+  const edgeCount = elements.length - nodeCount;
 
   const title = graph.nodes.find((n) => n.id === rootId)?.label ?? rootId;
   const controls = <GraphControls direction={direction} onDirection={setDirection} degree={degree} maxDepth={view.maxDepth} onDegree={setDegree} />;
-  const summary = edge ?? `${view.nodeCount} nodes · ${view.edgeCount} links${view.truncated ? ` · limited to ${MAX_NODES} nodes` : ''}`;
+  const hidden = view.nodeCount - nodeCount;
+  const summary =
+    edge ?? `${nodeCount} nodes · ${edgeCount} links${hidden ? ` · ${hidden} hidden by the legend` : ''}${view.truncated ? ` · limited to ${MAX_NODES} nodes` : ''}`;
   const empty = view.nodeCount <= 1;
 
   return (
@@ -64,8 +72,8 @@ export default function NeighbourhoodGraph({ model, nodeId, onSelect }: Neighbou
         </Typography>
       ) : (
         <>
-          {!fullScreen && <GraphCanvas elements={view.elements} rootId={rootId} onSelect={onSelect} onEdge={setEdge} height={360} />}
-          <GraphLegend elements={view.elements} />
+          {!fullScreen && <GraphCanvas elements={elements} rootId={rootId} onSelect={onSelect} onEdge={setEdge} height={360} />}
+          <GraphLegend elements={view.elements} controls={legendFilter} />
         </>
       )}
 
@@ -96,9 +104,9 @@ export default function NeighbourhoodGraph({ model, nodeId, onSelect }: Neighbou
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box sx={{ flexGrow: 1, minHeight: 0 }}>
-            {dialogReady && !empty && <GraphCanvas elements={view.elements} rootId={rootId} onSelect={onSelect} onEdge={setEdge} height="100%" />}
+            {dialogReady && !empty && <GraphCanvas elements={elements} rootId={rootId} onSelect={onSelect} onEdge={setEdge} height="100%" />}
           </Box>
-          {!empty && <GraphLegend elements={view.elements} />}
+          {!empty && <GraphLegend elements={view.elements} controls={legendFilter} />}
         </DialogContent>
       </Dialog>
     </Paper>

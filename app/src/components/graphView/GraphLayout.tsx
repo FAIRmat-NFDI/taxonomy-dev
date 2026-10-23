@@ -21,6 +21,7 @@ export function GraphLayout() {
           { label: 'Issues', content: () => <GraphInfoPanel /> },
         ],
         expandLabel: 'Show panel',
+        railTitle: 'Issues',
       }}
     />
   );

@@ -4,6 +4,7 @@ import { buildOntologyGraph, graphRootFor, queryErrorMessage, runSparql, withPre
 import { GraphCanvas } from '@/components/doc/graph/GraphCanvas';
 import { GraphControls } from '@/components/doc/graph/GraphControls';
 import { GraphLegend } from '@/components/doc/graph/GraphLegend';
+import { filterElements, useGraphFilter } from '@/components/doc/graph/graphFilter';
 import { createGraphIndex, fullGraph, MAX_NODES, neighbourhood, subgraphOf, type Direction } from '@/components/doc/graph/neighbourhood';
 import { CloseIcon, FullscreenIcon } from '@/assets';
 import { useSelectedNode } from '@/hooks/useOntology';
@@ -58,6 +59,11 @@ export function GraphExplorer({ model, source, text }: GraphExplorerProps) {
   const sparqlView = useMemo(() => (result && result.kind !== 'ask' ? subgraphOf(index, result.iris) : null), [index, result]);
   const subView = useMemo(() => (subRoot ? neighbourhood(index, subRoot, direction, Math.round(degree)) : null), [index, subRoot, direction, degree]);
   const view = subView ?? sparqlView ?? full;
+  // Legend chips filter by node / link kind (classes only at first); the centre and the selected node always stay.
+  const legendFilter = useGraphFilter();
+  const elements = useMemo(() => filterElements(view.elements, legendFilter.filter, [subRoot, focusId]), [view, legendFilter.filter, subRoot, focusId]);
+  const nodeCount = elements.filter((e) => e.group === 'nodes').length;
+  const hidden = view.nodeCount - nodeCount;
 
   const runQuery = async (query: string) => {
     if (!text) return;
@@ -75,7 +81,9 @@ export function GraphExplorer({ model, source, text }: GraphExplorerProps) {
   };
 
   const label = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? id;
-  const summary = edge ?? `${view.nodeCount} nodes · ${view.edgeCount} links${subView?.truncated ? ` · limited to ${MAX_NODES} nodes` : ''}`;
+  const summary =
+    edge ??
+    `${nodeCount} nodes · ${elements.length - nodeCount} links${hidden ? ` · ${hidden} hidden by the legend` : ''}${subView?.truncated ? ` · limited to ${MAX_NODES} nodes` : ''}`;
 
   const status = (
     <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
@@ -97,13 +105,13 @@ export function GraphExplorer({ model, source, text }: GraphExplorerProps) {
   );
 
   const canvas = (height: number | string) =>
-    view.nodeCount === 0 ? (
+    nodeCount === 0 ? (
       <Typography variant="body2" color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
         {sparqlView ? 'The query returned no nodes of this graph.' : 'Nothing to draw.'}
       </Typography>
     ) : (
       <GraphCanvas
-        elements={view.elements}
+        elements={elements}
         rootId={subRoot}
         focusId={focusId}
         zoomToFocusOnLayout={view === full}
@@ -151,7 +159,7 @@ export function GraphExplorer({ model, source, text }: GraphExplorerProps) {
           </Tooltip>
         </Box>
         <Box sx={{ flexShrink: 0, maxHeight: isDesktop ? 140 : undefined, overflowY: 'auto' }}>
-          <GraphLegend elements={view.elements} />
+          <GraphLegend elements={view.elements} controls={legendFilter} />
         </Box>
       </Paper>
       <Box sx={{ flexShrink: 0 }}>{sparqlBlock}</Box>
@@ -180,7 +188,7 @@ export function GraphExplorer({ model, source, text }: GraphExplorerProps) {
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box sx={{ flexGrow: 1, minHeight: 0 }}>{dialogReady && canvas('100%')}</Box>
-          <GraphLegend elements={view.elements} />
+          <GraphLegend elements={view.elements} controls={legendFilter} />
           <Box sx={{ p: 2, pt: 1 }}>{sparqlBlock}</Box>
         </DialogContent>
       </Dialog>

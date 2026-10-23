@@ -21,7 +21,7 @@ export function DocLayout(props: DocLayoutProps) {
       columns={{ sidebar: hierarchy, main: content, aside: comments }}
       sidebar={{ label: 'Ontology hierarchy', content: props.hierarchy }}
       main={{ label: 'Entity', content: props.content }}
-      aside={{ blocks: [{ label: 'Issues', content: props.comments }], expandLabel: 'Show issues' }}
+      aside={{ blocks: [{ label: 'Issues', content: props.comments }], expandLabel: 'Show issues', railTitle: 'Issues' }}
     />
   );
 }

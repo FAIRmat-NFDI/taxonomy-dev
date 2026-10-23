@@ -8,3 +8,4 @@ export { PropertySection, type PropertyRow } from './PropertySection';
 export { SearchPanelHeader } from './SearchPanelHeader';
 export { OverviewSection } from './OverviewSection';
 export { describeNode, describeOntology } from './nodeView';
+export { AxiomSection } from './AxiomSection';

@@ -13,7 +13,7 @@ interface CommentsPanelProps {
   onCollapse?: () => void;
   /**
    * With nothing selected, list every open issue about the file (newest first), each labelled with
-   * its node, instead of the issues about the ontology header. Used on /graph.
+   * its node, instead of the issues about the ontology header. Used on /doc and /graph.
    */
   showAllWhenNoSelection?: boolean;
 }

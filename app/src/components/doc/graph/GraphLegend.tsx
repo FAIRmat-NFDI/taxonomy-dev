@@ -1,6 +1,8 @@
-import { Chip, Stack, SvgIcon, Typography } from '@mui/material';
+import type { ReactElement } from 'react';
+import { Chip, Stack, SvgIcon, Tooltip, Typography } from '@mui/material';
 import type { ElementDefinition } from 'cytoscape';
 import type { EdgeRelation, GraphNodeKind } from '@/api';
+import { countKinds, type GraphFilterControls } from './graphFilter';
 import { EDGE_STYLES, NODE_STYLES, type EdgeStyle, type NodeShape } from './graphStyle';
 
 /** Legend glyphs drawn with MUI SvgIcon, matching the Cytoscape node shapes. */
@@ -38,17 +40,38 @@ function LinkGlyph({ relation }: { relation: EdgeRelation }) {
   );
 }
 
-/** One legend for the current view: the OWL 2 node kinds and link kinds it contains. */
-export function GraphLegend({ elements }: { elements: ElementDefinition[] }) {
-  const kinds = new Set<GraphNodeKind>();
-  const relations = new Set<EdgeRelation>();
-  let external = false;
-  for (const el of elements) {
-    if (el.group === 'nodes') {
-      kinds.add(el.data.kind as GraphNodeKind);
-      external ||= !!el.data.external;
-    } else relations.add(el.data.relation as EdgeRelation);
-  }
+interface GraphLegendProps {
+  /** The view before filtering: every kind in it gets a chip. */
+  elements: ElementDefinition[];
+  /** With filter controls the chips are toggles; without, the legend is read-only. */
+  controls?: GraphFilterControls;
+}
+
+/**
+ * One legend for the current view: the OWL 2 node kinds and link kinds it contains, with counts.
+ * Chips toggle what is drawn (filled = shown); at least one node kind — and one link kind — stays on.
+ */
+export function GraphLegend({ elements, controls }: GraphLegendProps) {
+  const { kinds, relations, external } = countKinds(elements);
+  const filter = controls?.filter;
+  const kindOn = (k: GraphNodeKind) => !filter || filter.kinds.has(k);
+  const relationOn = (r: EdgeRelation) => !filter || !filter.hiddenRelations.has(r);
+  const shownKinds = [...kinds.keys()].filter(kindOn).length;
+  const shownRelations = [...relations.keys()].filter(relationOn).length;
+
+  const chip = (key: string, on: boolean, last: boolean, icon: ReactElement, label: string, count: number, toggle?: () => void) => (
+    <Tooltip key={key} describeChild title={toggle ? (on ? (last ? 'At least one stays shown' : `Hide ${label.toLowerCase()}`) : `Show ${label.toLowerCase()}`) : ''}>
+      <Chip
+        size="small"
+        variant={on ? 'filled' : 'outlined'}
+        icon={icon}
+        label={`${label} (${count})`}
+        onClick={toggle}
+        aria-pressed={toggle ? on : undefined}
+        sx={on ? undefined : { color: 'text.disabled', '& .MuiChip-icon': { opacity: 0.4 } }}
+      />
+    </Tooltip>
+  );
 
   return (
     <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 0.75, alignItems: 'center', px: 2, py: 1.5, borderTop: 1, borderColor: 'divider' }}>
@@ -57,17 +80,25 @@ export function GraphLegend({ elements }: { elements: ElementDefinition[] }) {
       </Typography>
       {(Object.keys(NODE_STYLES) as GraphNodeKind[])
         .filter((k) => kinds.has(k))
-        .map((k) => (
-          <Chip key={k} size="small" variant="outlined" icon={<NodeGlyph kind={k} />} label={NODE_STYLES[k].label} />
-        ))}
+        .map((k) =>
+          chip(k, kindOn(k), kindOn(k) && shownKinds <= 1, <NodeGlyph kind={k} />, NODE_STYLES[k].label, kinds.get(k)!, controls && (() => controls.toggleKind(k))),
+        )}
       {external && <Chip size="small" variant="outlined" label="Dashed outline: not defined in this file" />}
       {(Object.keys(EDGE_STYLES) as EdgeRelation[])
         .filter((r) => relations.has(r))
-        .map((r) => (
-          <Chip key={r} size="small" variant="outlined" icon={<LinkGlyph relation={r} />} label={EDGE_STYLES[r].label} />
-        ))}
+        .map((r) =>
+          chip(
+            r,
+            relationOn(r),
+            relationOn(r) && shownRelations <= 1,
+            <LinkGlyph relation={r} />,
+            EDGE_STYLES[r].label,
+            relations.get(r)!,
+            controls && (() => controls.toggleRelation(r, relations.keys())),
+          ),
+        )}
       <Typography variant="caption" color="text.secondary">
-        Click a link to see its exact name.
+        {controls ? 'Click a chip to show or hide that kind · click a link to see its exact name.' : 'Click a link to see its exact name.'}
       </Typography>
     </Stack>
   );

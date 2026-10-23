@@ -2,8 +2,9 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { Alert, Box, IconButton, Skeleton, Stack, Tooltip, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { OpenInViewIcon, PaneCollapseIcon } from '@/assets';
-import { CommentsPanel, OverviewSection, PanelBody, PanelHeader, SearchPanelHeader, describeNode, describeOntology } from '@/components/doc';
+import { AxiomSection, CommentsPanel, OverviewSection, PanelBody, PanelHeader, SearchPanelHeader, describeNode, describeOntology } from '@/components/doc';
 import { paths } from '@/routes/paths';
+import type { Notation } from '@/api';
 import { useOntology, useSelectedNode } from '@/hooks/useOntology';
 import { ChipGroup } from './ChipGroup';
 import { GraphExplorer } from './GraphExplorer';
@@ -113,7 +114,7 @@ export function GraphCanvasPanel() {
 }
 
 /**
- * Column 3, first block (div_3_1): the selected entity — name, IRI and its /doc overview — or, with no
+ * Column 3, first block (div_3_1): the selected entity — name, IRI, its /doc overview and axioms & relations — or, with no
  * chip selected, the ontology itself. The link icon opens the same thing in /doc; the chevron collapses
  * the column (desktop).
  */
@@ -121,6 +122,7 @@ export function GraphDetailsPanel({ onCollapse }: { onCollapse?: () => void }) {
   const { status, model, source, text, access } = useOntology();
   const [selected] = useSelectedNode();
   const [showCode, setShowCode] = useState(false);
+  const [notation, setNotation] = useState<Notation>('manchester');
 
   const ready = status === 'ready' && model && source;
   const view = ready ? (selected ? describeNode(model, source, selected) : describeOntology(model, source, !access?.canComment)) : null;
@@ -156,15 +158,27 @@ export function GraphDetailsPanel({ onCollapse }: { onCollapse?: () => void }) {
         {loading && <Skeleton variant="rounded" height={120} />}
         {ready && selected && !view && <Alert severity="warning">Nothing called “{selected}” in this version of the ontology.</Alert>}
         {ready && view && (
-          <OverviewSection
-            model={model}
-            text={text}
-            source={source}
-            nodeId={selected}
-            view={view}
-            showCode={showCode}
-            onToggleCode={() => setShowCode((v) => !v)}
-          />
+          <Stack spacing={2}>
+            <OverviewSection
+              model={model}
+              text={text}
+              source={source}
+              nodeId={selected}
+              view={view}
+              showCode={showCode}
+              onToggleCode={() => setShowCode((v) => !v)}
+            />
+            {/* Same section as /doc: logical axioms both ways, Σ toggles Description Logic */}
+            {selected && model.header?.iri !== selected && (
+              <AxiomSection
+                model={model}
+                source={source}
+                nodeId={selected}
+                notation={notation}
+                onToggleNotation={() => setNotation((n) => (n === 'dl' ? 'manchester' : 'dl'))}
+              />
+            )}
+          </Stack>
         )}
       </PanelBody>
     </>
