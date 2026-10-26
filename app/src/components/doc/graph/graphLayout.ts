@@ -21,7 +21,7 @@ const HUB_DISTANCE = 60;
 const PER_SQRT_DEGREE = 20;
 const CHARGE = -260;
 const CENTRE_PULL = 0.04;
-const NODE_RADIUS = 21;
+const NODE_RADIUS = 24;
 
 interface Node extends SimulationNodeDatum {
   id: string;

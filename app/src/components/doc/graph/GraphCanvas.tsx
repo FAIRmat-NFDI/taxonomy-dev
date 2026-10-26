@@ -7,6 +7,7 @@ import { useBusyTask } from '@/hooks/useBusy';
 import { fontFamily } from '@/theme';
 import { layoutOptions } from './graphLayout';
 import { EDGE_STYLES, NODE_STYLES } from './graphStyle';
+import { expandedSize, fittedLabel, LABEL_FONT, nodeSize, SELECTED_FONT, textBox } from './nodeLabel';
 
 
 /** Above this many elements the layout takes long enough to show the busy overlay. */
@@ -52,18 +53,11 @@ function fitView(cy: cytoscape.Core) {
   }
 }
 
-/** Node diameters (px): entities, anonymous expressions. */
-const NODE_SIZE = 38;
-const EXPRESSION_SIZE = 28;
-/** Labels longer than this are shortened inside a small node (the full name shows when it is selected). */
-const SHORT_LABEL = 18;
-
-const shortLabel = (label: string) => (label.length > SHORT_LABEL ? `${label.slice(0, SHORT_LABEL - 1)}…` : label);
-/** Size a selected node grows to so its full, wrapped name fits. */
-const expandedSize = (label: string) => Math.min(130, Math.max(NODE_SIZE + 12, Math.ceil(Math.sqrt(label.length) * 16)));
 /** Readable text on the node colour (MUI's contrast helper); dark text on light, faded fills. */
+const kindOf = (el: cytoscape.NodeSingular) => el.data('kind') as GraphNodeKind;
+
 function textColor(theme: Theme, el: cytoscape.NodeSingular): string {
-  const style = NODE_STYLES[el.data('kind') as GraphNodeKind];
+  const style = NODE_STYLES[kindOf(el)];
   if (el.data('external') || (style.opacity ?? 1) < 1) return theme.palette.text.primary;
   return theme.palette.getContrastText(style.color);
 }
@@ -72,37 +66,35 @@ function textColor(theme: Theme, el: cytoscape.NodeSingular): string {
 function stylesheet(theme: Theme): StylesheetJson {
   const { palette } = theme;
   return [
-    // Labels sit inside the node, wrapped (long names shortened); a selected node grows to show its full name.
+    // Labels sit inside the node, bold, wrapped within the shape's text box (narrow shapes get a smaller,
+    // lower box); long names are shortened. A selected node grows to show its full name (see nodeLabel).
     {
       selector: 'node',
       style: {
-        label: (el: cytoscape.NodeSingular) => shortLabel(el.data('label')),
+        label: (el: cytoscape.NodeSingular) => fittedLabel(kindOf(el), el.data('label')),
         'font-family': fontFamily,
-        'font-size': 7,
-        'line-height': 1.1,
+        'font-size': (el: cytoscape.NodeSingular) => (nodeSize(kindOf(el)) < 34 ? LABEL_FONT - 1 : LABEL_FONT),
+        'font-weight': 700,
+        'line-height': 1.15,
         color: (el: cytoscape.NodeSingular) => textColor(theme, el),
         'text-valign': 'center',
         'text-halign': 'center',
         'text-wrap': 'wrap',
         'text-overflow-wrap': 'anywhere',
-        'text-max-width': `${NODE_SIZE - 6}px`,
-        width: NODE_SIZE,
-        height: NODE_SIZE,
-        shape: (el: cytoscape.NodeSingular) => NODE_STYLES[el.data('kind') as GraphNodeKind].shape,
-        'background-color': (el: cytoscape.NodeSingular) => NODE_STYLES[el.data('kind') as GraphNodeKind].color,
-        'background-opacity': (el: cytoscape.NodeSingular) => NODE_STYLES[el.data('kind') as GraphNodeKind].opacity ?? 1,
+        'text-max-width': (el: cytoscape.NodeSingular) => `${textBox(kindOf(el), nodeSize(kindOf(el))).maxWidth}px`,
+        'text-margin-y': (el: cytoscape.NodeSingular) => textBox(kindOf(el), nodeSize(kindOf(el))).marginY,
+        width: (el: cytoscape.NodeSingular) => nodeSize(kindOf(el)),
+        height: (el: cytoscape.NodeSingular) => nodeSize(kindOf(el)),
+        shape: (el: cytoscape.NodeSingular) => NODE_STYLES[kindOf(el)].shape,
+        'background-color': (el: cytoscape.NodeSingular) => NODE_STYLES[kindOf(el)].color,
+        'background-opacity': (el: cytoscape.NodeSingular) => NODE_STYLES[kindOf(el)].opacity ?? 1,
         'border-width': 1,
         'border-color': palette.background.paper,
         // Growing / shrinking on (de)selection is animated.
-        'transition-property': 'width, height, font-size',
+        'transition-property': 'width, height, font-size, text-margin-y',
         'transition-duration': 180,
         'transition-timing-function': 'ease-out',
       },
-    },
-    // Anonymous expressions: a bit smaller.
-    {
-      selector: 'node[kind = "restriction"], node[kind = "booleanExpression"], node[kind = "enumeration"], node[kind = "dataRange"], node[kind = "inverseProperty"], node[kind = "expression"]',
-      style: { width: EXPRESSION_SIZE, height: EXPRESSION_SIZE, 'font-size': 6, 'text-max-width': `${EXPRESSION_SIZE - 4}px` },
     },
     { selector: 'node[?external]', style: { 'background-opacity': 0.3, 'border-width': 1.5, 'border-style': 'dashed', 'border-color': palette.text.secondary } },
     // Selected (clicked, or chosen elsewhere) and neighbourhood centre: full name, node grows to fit it.
@@ -110,11 +102,11 @@ function stylesheet(theme: Theme): StylesheetJson {
       selector: 'node:selected, node.root',
       style: {
         label: 'data(label)',
-        width: (el: cytoscape.NodeSingular) => expandedSize(el.data('label')),
-        height: (el: cytoscape.NodeSingular) => expandedSize(el.data('label')),
-        'text-max-width': (el: cytoscape.NodeSingular) => `${expandedSize(el.data('label')) - 10}px`,
-        'font-size': 10,
-        'font-weight': 600,
+        width: (el: cytoscape.NodeSingular) => expandedSize(kindOf(el), el.data('label')),
+        height: (el: cytoscape.NodeSingular) => expandedSize(kindOf(el), el.data('label')),
+        'text-max-width': (el: cytoscape.NodeSingular) => `${textBox(kindOf(el), expandedSize(kindOf(el), el.data('label'))).maxWidth}px`,
+        'text-margin-y': (el: cytoscape.NodeSingular) => textBox(kindOf(el), expandedSize(kindOf(el), el.data('label'))).marginY,
+        'font-size': SELECTED_FONT,
         'z-index': 30,
       },
     },
