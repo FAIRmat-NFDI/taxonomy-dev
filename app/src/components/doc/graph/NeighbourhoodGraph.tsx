@@ -18,6 +18,7 @@ interface NeighbourhoodGraphProps {
 /**
  * Graph block under the details / code view: the selected node and its neighbours up to N steps,
  * following inward, outward, or all edges. Opens in a large dialog for exploring.
+ * Click a node to see its full name; double-click it to open that node (and its neighbourhood).
  */
 export default function NeighbourhoodGraph({ model, nodeId, onSelect }: NeighbourhoodGraphProps) {
   const graph = useMemo(() => buildOntologyGraph(model), [model]);
@@ -72,7 +73,7 @@ export default function NeighbourhoodGraph({ model, nodeId, onSelect }: Neighbou
         </Typography>
       ) : (
         <>
-          {!fullScreen && <GraphCanvas elements={elements} rootId={rootId} onSelect={onSelect} onEdge={setEdge} height={360} />}
+          {!fullScreen && <GraphCanvas elements={elements} rootId={rootId} onExpand={onSelect} onEdge={setEdge} height={360} />}
           <GraphLegend elements={view.elements} controls={legendFilter} />
         </>
       )}
@@ -104,7 +105,7 @@ export default function NeighbourhoodGraph({ model, nodeId, onSelect }: Neighbou
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Box sx={{ flexGrow: 1, minHeight: 0 }}>
-            {dialogReady && !empty && <GraphCanvas elements={elements} rootId={rootId} onSelect={onSelect} onEdge={setEdge} height="100%" />}
+            {dialogReady && !empty && <GraphCanvas elements={elements} rootId={rootId} onExpand={onSelect} onEdge={setEdge} height="100%" />}
           </Box>
           {!empty && <GraphLegend elements={view.elements} controls={legendFilter} />}
         </DialogContent>

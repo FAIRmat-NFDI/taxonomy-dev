@@ -7,7 +7,7 @@ const { issueReference } = await import('./issueReference');
 const { indexIssues, nodeAtLine, stripReference } = await import('./issueIndex');
 
 const NS = 'https://example.org/fairmat/playground#';
-const source: LoadedSource = { owner: 'FAIRmat-NFDI', repo: 'taxonomy-dev', branch: 'main', path: 'main.ttl', commit: 'abc1234def' };
+const source: LoadedSource = { owner: 'FAIRmat-NFDI', repo: 'fairmat-taxonomy-v2', branch: 'main', path: 'main.ttl', commit: 'abc1234def' };
 let model: OntologyModel;
 
 const thread = (id: number, anchor: CommentThread['anchor']): CommentThread => ({

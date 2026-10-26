@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ElementDefinition } from 'cytoscape';
 import type { EdgeRelation, GraphNodeKind } from '@/api';
 
@@ -79,7 +79,9 @@ export function useGraphFilter() {
     });
   }, []);
 
-  return { filter: { kinds, hiddenRelations } as GraphFilter, toggleKind, toggleRelation };
+  // Stable object: a new one on every render would rebuild (and re-lay out) the graph each time.
+  const filter = useMemo<GraphFilter>(() => ({ kinds, hiddenRelations }), [kinds, hiddenRelations]);
+  return useMemo(() => ({ filter, toggleKind, toggleRelation }), [filter, toggleKind, toggleRelation]);
 }
 
 export type GraphFilterControls = ReturnType<typeof useGraphFilter>;

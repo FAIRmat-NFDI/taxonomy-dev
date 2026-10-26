@@ -61,7 +61,12 @@ export function GraphExplorer({ model, source, text }: GraphExplorerProps) {
   const view = subView ?? sparqlView ?? full;
   // Legend chips filter by node / link kind (classes only at first); the centre and the selected node always stay.
   const legendFilter = useGraphFilter();
-  const elements = useMemo(() => filterElements(view.elements, legendFilter.filter, [subRoot, focusId]), [view, legendFilter.filter, subRoot, focusId]);
+  // The selected node is forced in only when the legend would hide it — otherwise selecting a node must
+  // not change the elements (that would lay the graph out again and swallow a double-click).
+  const kindOf = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n.kind])), [graph]);
+  const focusKind = focusId ? kindOf.get(focusId) : undefined;
+  const forcedFocus = focusId && focusKind && !legendFilter.filter.kinds.has(focusKind) ? focusId : null;
+  const elements = useMemo(() => filterElements(view.elements, legendFilter.filter, [subRoot, forcedFocus]), [view, legendFilter.filter, subRoot, forcedFocus]);
   const nodeCount = elements.filter((e) => e.group === 'nodes').length;
   const hidden = view.nodeCount - nodeCount;
 

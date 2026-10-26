@@ -3,7 +3,8 @@ import type { OntologyGraph } from '@/api';
 
 export type Direction = 'all' | 'in' | 'out';
 
-export const DEFAULT_DEPTH = 5;
+/** Neighbourhood degree when a graph opens (the slider can go further). */
+export const DEFAULT_DEPTH = 2;
 /** Rendering more than this gets unreadable (and slow to lay out). */
 export const MAX_NODES = 250;
 

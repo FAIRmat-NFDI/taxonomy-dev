@@ -98,7 +98,7 @@ export function GraphLegend({ elements, controls }: GraphLegendProps) {
           ),
         )}
       <Typography variant="caption" color="text.secondary">
-        {controls ? 'Click a chip to show or hide that kind · click a link to see its exact name.' : 'Click a link to see its exact name.'}
+        {controls ? 'Click a chip to show or hide that kind · click a node or link for its full name · double-click a node to explore it.' : 'Click a node or link for its full name · double-click a node to explore it.'}
       </Typography>
     </Stack>
   );

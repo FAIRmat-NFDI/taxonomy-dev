@@ -1,19 +1,17 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { Box, Divider, IconButton, Paper, Tooltip, useTheme, type Theme } from '@mui/material';
 import cytoscape, { type ElementDefinition, type StylesheetJson } from 'cytoscape';
-import fcose from 'cytoscape-fcose';
 import type { EdgeRelation, GraphNodeKind } from '@/api';
 import { FitViewIcon, ZoomInIcon, ZoomOutIcon } from '@/assets';
 import { useBusyTask } from '@/hooks/useBusy';
 import { fontFamily } from '@/theme';
+import { layoutOptions } from './graphLayout';
 import { EDGE_STYLES, NODE_STYLES } from './graphStyle';
 
-cytoscape.use(fcose);
 
 /** Above this many elements the layout takes long enough to show the busy overlay. */
 const BUSY_THRESHOLD = 150;
 
-const LAYOUT = { name: 'fcose', animate: false, randomize: true, nodeDimensionsIncludeLabels: true, idealEdgeLength: () => 90, padding: 24, fit: false };
 /** Zoom factor per button press. */
 const ZOOM_STEP = 1.3;
 /** Small graphs are not blown up beyond this zoom when fitted. */
@@ -28,6 +26,8 @@ function markFocus(cy: cytoscape.Core, id: string | null): cytoscape.CollectionR
   const node = id ? cy.getElementById(id) : null;
   if (!node || node.empty()) return null;
   node.addClass('focus');
+  cy.nodes(':selected').unselect();
+  node.select();
   return node;
 }
 
@@ -52,45 +52,77 @@ function fitView(cy: cytoscape.Core) {
   }
 }
 
+/** Node diameters (px): entities, anonymous expressions. */
+const NODE_SIZE = 38;
+const EXPRESSION_SIZE = 28;
+/** Labels longer than this are shortened inside a small node (the full name shows when it is selected). */
+const SHORT_LABEL = 18;
+
+const shortLabel = (label: string) => (label.length > SHORT_LABEL ? `${label.slice(0, SHORT_LABEL - 1)}…` : label);
+/** Size a selected node grows to so its full, wrapped name fits. */
+const expandedSize = (label: string) => Math.min(130, Math.max(NODE_SIZE + 12, Math.ceil(Math.sqrt(label.length) * 16)));
+/** Readable text on the node colour (MUI's contrast helper); dark text on light, faded fills. */
+function textColor(theme: Theme, el: cytoscape.NodeSingular): string {
+  const style = NODE_STYLES[el.data('kind') as GraphNodeKind];
+  if (el.data('external') || (style.opacity ?? 1) < 1) return theme.palette.text.primary;
+  return theme.palette.getContrastText(style.color);
+}
+
 /** Cytoscape cannot read CSS variables, so the stylesheet takes concrete values from the MUI theme. */
 function stylesheet(theme: Theme): StylesheetJson {
   const { palette } = theme;
   return [
+    // Labels sit inside the node, wrapped (long names shortened); a selected node grows to show its full name.
     {
       selector: 'node',
       style: {
-        label: 'data(label)',
+        label: (el: cytoscape.NodeSingular) => shortLabel(el.data('label')),
         'font-family': fontFamily,
-        'font-size': 10,
-        color: palette.text.primary,
-        'text-valign': 'bottom',
-        'text-margin-y': 4,
-        'text-wrap': 'ellipsis',
-        'text-max-width': '120px',
-        width: 18,
-        height: 18,
+        'font-size': 7,
+        'line-height': 1.1,
+        color: (el: cytoscape.NodeSingular) => textColor(theme, el),
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-wrap': 'wrap',
+        'text-overflow-wrap': 'anywhere',
+        'text-max-width': `${NODE_SIZE - 6}px`,
+        width: NODE_SIZE,
+        height: NODE_SIZE,
         shape: (el: cytoscape.NodeSingular) => NODE_STYLES[el.data('kind') as GraphNodeKind].shape,
         'background-color': (el: cytoscape.NodeSingular) => NODE_STYLES[el.data('kind') as GraphNodeKind].color,
         'background-opacity': (el: cytoscape.NodeSingular) => NODE_STYLES[el.data('kind') as GraphNodeKind].opacity ?? 1,
         'border-width': 1,
         'border-color': palette.background.paper,
+        // Growing / shrinking on (de)selection is animated.
+        'transition-property': 'width, height, font-size',
+        'transition-duration': 180,
+        'transition-timing-function': 'ease-out',
       },
     },
-    // Anonymous expressions: smaller, secondary text.
+    // Anonymous expressions: a bit smaller.
     {
       selector: 'node[kind = "restriction"], node[kind = "booleanExpression"], node[kind = "enumeration"], node[kind = "dataRange"], node[kind = "inverseProperty"], node[kind = "expression"]',
-      style: { width: 16, height: 12, color: palette.text.secondary, 'font-size': 9 },
+      style: { width: EXPRESSION_SIZE, height: EXPRESSION_SIZE, 'font-size': 6, 'text-max-width': `${EXPRESSION_SIZE - 4}px` },
     },
     { selector: 'node[?external]', style: { 'background-opacity': 0.3, 'border-width': 1.5, 'border-style': 'dashed', 'border-color': palette.text.secondary } },
+    // Selected (clicked, or chosen elsewhere) and neighbourhood centre: full name, node grows to fit it.
     {
-      selector: 'node.root',
-      style: { width: 30, height: 30, 'border-width': 3, 'border-color': palette.text.primary, 'font-size': 12, 'font-weight': 600 },
+      selector: 'node:selected, node.root',
+      style: {
+        label: 'data(label)',
+        width: (el: cytoscape.NodeSingular) => expandedSize(el.data('label')),
+        height: (el: cytoscape.NodeSingular) => expandedSize(el.data('label')),
+        'text-max-width': (el: cytoscape.NodeSingular) => `${expandedSize(el.data('label')) - 10}px`,
+        'font-size': 10,
+        'font-weight': 600,
+        'z-index': 30,
+      },
     },
-    // Focused node (selected elsewhere, e.g. a chip): primary ring, label on top.
-    {
-      selector: 'node.focus',
-      style: { width: 30, height: 30, 'border-width': 4, 'border-color': palette.primary.main, 'font-size': 13, 'font-weight': 600, 'z-index': 20 },
-    },
+    { selector: 'node.root', style: { 'border-width': 3, 'border-color': palette.text.primary } },
+    // Focused node (selected elsewhere, e.g. a chip): primary ring.
+    { selector: 'node.focus', style: { 'border-width': 4, 'border-color': palette.primary.main, 'z-index': 31 } },
+    // Cytoscape's default selection overlay is replaced by the growth above.
+    { selector: 'node:selected', style: { 'overlay-opacity': 0 } },
     { selector: 'node:active', style: { 'overlay-opacity': 0.08, 'overlay-color': palette.primary.main } },
     {
       selector: 'edge',
@@ -128,8 +160,8 @@ interface GraphCanvasProps {
   rootId: string | null;
   /** Node to centre and zoom to (animated, no new layout); clearing it fits the whole view again. */
   focusId?: string | null;
-  /** Tapping a node selects it (centres the view on it). */
-  onSelect: (id: string) => void;
+  /** Tapping a node selects it: it grows in place to show its full name (the camera does not move). */
+  onSelect?: (id: string) => void;
   /** After a new layout: also centre and zoom on `focusId` (otherwise the focus is only marked and the view fitted). */
   zoomToFocusOnLayout?: boolean;
   /** Double-click / double-tap on a node. */
@@ -142,7 +174,7 @@ interface GraphCanvasProps {
 }
 
 /**
- * Cytoscape canvas (fcose force layout). Rebuilt when the elements change; pan / zoom / drag built in.
+ * Cytoscape canvas (WebVOWL-style d3-force layout, see graphLayout). Rebuilt when the elements change; pan / zoom / drag built in.
  * The layout runs after the container has been painted at its final size (dialogs, panes), and
  * the canvas stays hidden until it is done — no half-laid-out frame.
  */
@@ -162,7 +194,9 @@ export function GraphCanvas({
   const instance = useRef<cytoscape.Core | null>(null);
   const theme = useTheme();
   const busy = useBusyTask();
-  const select = useEffectEvent((id: string) => onSelect(id));
+  const select = useEffectEvent((id: string) => onSelect?.(id));
+  /** Node just tapped on the canvas: when it comes back as the focus, the camera stays put. */
+  const tapped = useRef<string | null>(null);
   const expand = useEffectEvent((id: string) => onExpand?.(id));
   /** Latest focus, read when a layout finishes (the focus may be set before the graph is ready). */
   const focusRef = useRef(focusId);
@@ -191,7 +225,10 @@ export function GraphCanvas({
     instance.current = cy;
     laidOut.current = false;
     if (rootId) cy.getElementById(rootId).addClass('root');
-    cy.on('tap', 'node', (event) => select(event.target.id()));
+    cy.on('tap', 'node', (event) => {
+      tapped.current = event.target.id();
+      select(event.target.id());
+    });
     cy.on('dbltap', 'node', (event) => expand(event.target.id()));
     cy.on('select', 'edge', (event) => {
       const edge = event.target;
@@ -204,7 +241,7 @@ export function GraphCanvas({
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
         cy.resize();
-        const layout = cy.layout(LAYOUT as cytoscape.LayoutOptions);
+        const layout = cy.layout(layoutOptions(elements));
         layout.one('layoutstop', () => {
           laidOut.current = true;
           fitView(cy);
@@ -243,6 +280,11 @@ export function GraphCanvas({
     focusRef.current = focusId;
     const cy = instance.current;
     if (!cy || !laidOut.current) return;
+    // A node tapped on the canvas only grows where it is — moving the camera would also break a double-click.
+    if (focusId && focusId === tapped.current) {
+      markFocus(cy, focusId);
+      return;
+    }
     if (!focusOn(cy, focusId, true)) cy.animate({ fit: { eles: cy.elements(), padding: 24 } }, { duration: 300 });
   }, [focusId]);
 
